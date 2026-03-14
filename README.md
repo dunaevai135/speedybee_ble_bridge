@@ -1,101 +1,99 @@
 # SpeedyBee BLE-to-UDP Bridge
 
-[![English version](https://img.shields.io/badge/lang-en-green)](README.en.md)
+A bridge between SpeedyBee flight controllers (BLE UART) and ground control stations (GCS) over UDP.
 
-Мост между полётным контроллером SpeedyBee (BLE UART) и наземными станциями управления (GCS) по UDP.
+There are now two variants in this repository:
+- a Python script for Linux
+- a beta Android app that does the same job: connects to the FC over BLE and forwards traffic over UDP
 
-Сейчас в репозитории есть два варианта:
-- Python-скрипт для Linux
-- бета Android-приложение, которое делает то же самое: подключается к FC по BLE и пробрасывает трафик по UDP
+## Why
 
-## Зачем это нужно
+SpeedyBee flight controllers (F405 V4, F405 Wing, eFLY-BLE, etc.) have a built-in BLE module (ESP32) that the SpeedyBee mobile app uses to communicate with the FC via a proprietary BLE protocol plus MSP. However, full-featured GCS applications — **Mission Planner** and **QGroundControl** — cannot connect to the FC over BLE directly.
 
-Контроллеры SpeedyBee (F405 V4, F405 Wing, eFLY-BLE и др.) имеют встроенный BLE-модуль (ESP32), через который приложение SpeedyBee на телефоне общается с FC по проприетарному BLE-протоколу и MSP. Однако полноценные GCS — **Mission Planner** и **QGroundControl** — не умеют подключаться к FC по BLE напрямую.
+This script bridges the gap: it connects to the controller over BLE from a computer and creates a transparent serial channel over UDP. The GCS sees it as a regular MAVLink connection.
 
-Этот скрипт решает проблему: он подключается к контроллеру по BLE с компьютера и пробрасывает прозрачный serial-канал через UDP. GCS видит это как обычное MAVLink-соединение.
+This allows you to:
+- Configure ArduPilot/Betaflight via Mission Planner or QGroundControl without a USB cable
+- Receive real-time telemetry over BLE
+- Use the flight controller CLI remotely
 
-Это позволяет:
-- Настраивать ArduPilot/Betaflight через Mission Planner или QGroundControl без USB-кабеля
-- Получать телеметрию в реальном времени по BLE
-- Использовать CLI полётного контроллера удалённо
+## What's new
 
-## Что нового
+- The script now implements the full SpeedyBee handshake instead of only the basic serial passthrough entry
+- BLE password authentication is supported for newer boards that require it
+- Boards that need an initial MSP packet to start streaming are handled as well
+- The repository now includes a beta Android client with the same purpose; sources are in `android/` and the current build is `app-debug.apk`
 
-- Скрипт теперь поддерживает полный SpeedyBee handshake, а не только базовый вход в serial passthrough
-- Добавлена поддержка BLE-пароля для новых плат, где требуется аутентификация
-- Проверено на платах, которым нужен дополнительный стартовый MSP-пакет, чтобы начать поток данных
-- В репозитории появился бета Android-клиент с тем же назначением, исходники лежат в `android/`, готовая сборка сейчас есть как `app-debug.apk`
+## Requirements
 
-## Требования
-
-- Linux с BlueZ
+- Linux with BlueZ
 - Python 3.11+
 - [uv](https://github.com/astral-sh/uv)
 
-## Использование
+## Usage
 
 ```bash
-# Сканировать BLE-устройства
+# Scan for BLE devices
 uv run speedybee_ble_bridge.py --scan
 
-# Подключиться по MAC-адресу
+# Connect by MAC address
 uv run speedybee_ble_bridge.py --addr 10:B4:1D:BD:B6:12
 
-# Подключиться по имени
+# Connect by device name
 uv run speedybee_ble_bridge.py --name "SpeedyBee F405 V4"
 
-# Для плат с BLE-паролем
+# For boards protected by a BLE password
 uv run speedybee_ble_bridge.py --addr 6C:C8:40:E0:86:64 --password XXXX
 
-# С отладочным выводом
+# With debug output
 uv run speedybee_ble_bridge.py --addr 10:B4:1D:BD:B6:12 -v
 ```
 
-По умолчанию мост слушает UDP на `0.0.0.0:14551` и отправляет данные на `127.0.0.1:14550`.
+By default the bridge listens on UDP `0.0.0.0:14551` and sends data to `127.0.0.1:14550`.
 
-## Настройка Mission Planner
+## Mission Planner setup
 
-1. Запустить мост
-2. В Mission Planner: **CONNECT** → выбрать **UDP** → нажать **Connect**
-3. Ввести порт: **14550**
+1. Start the bridge
+2. In Mission Planner: **CONNECT** → select **UDP** → click **Connect**
+3. Enter port: **14550**
 4. Listening host: **127.0.0.1**
 
-Mission Planner начнёт принимать MAVLink-пакеты с контроллера.
+Mission Planner will start receiving MAVLink packets from the controller.
 
-## Настройка QGroundControl
+## QGroundControl setup
 
-1. Запустить мост
+1. Start the bridge
 2. QGroundControl: **Application Settings** → **Comm Links** → **Add**
-3. Тип: **UDP**
+3. Type: **UDP**
 4. Port: **14550**
 5. Server Address: **127.0.0.1**
-6. Нажать **Connect**
+6. Click **Connect**
 
-## Настройка MAVProxy
+## MAVProxy setup
 
 ```bash
 mavproxy.py --master=udp:127.0.0.1:14550
 ```
 
-## Параметры командной строки
+## CLI arguments
 
-| Параметр | По умолчанию | Описание |
+| Argument | Default | Description |
 |---|---|---|
-| `--scan` | | Сканировать BLE-устройства и выйти |
-| `--addr` | | MAC-адрес контроллера |
-| `--name` | | Имя BLE-устройства для поиска |
-| `--password` | | BLE-пароль, если плата требует аутентификацию |
-| `--udp-local` | `0.0.0.0:14551` | Локальный UDP-адрес (приём от GCS) |
-| `--udp-remote` | `127.0.0.1:14550` | UDP-адрес GCS (отправка данных) |
-| `-v` | | Подробный лог |
+| `--scan` | | Scan for BLE devices and exit |
+| `--addr` | | Controller BLE MAC address |
+| `--name` | | BLE device name to search for |
+| `--password` | | BLE password, if the board requires authentication |
+| `--udp-local` | `0.0.0.0:14551` | Local UDP bind address (receive from GCS) |
+| `--udp-remote` | `127.0.0.1:14550` | Remote UDP address (send to GCS) |
+| `-v` | | Verbose logging |
 
-## GATT-профиль SpeedyBee
+## SpeedyBee GATT profile
 
-Сервис `0xABF0`:
+Service `0xABF0`:
 
-| UUID | Роль | Описание |
+| UUID | Role | Description |
 |---|---|---|
-| `0xABF1` | TX (Write) | Serial-канал: хост → FC (MSP/CLI/MAVLink) |
-| `0xABF2` | RX (Notify) | Serial-канал: FC → хост |
-| `0xABF3` | TX (Write) | Проприетарный: хендшейк, запрос инфо |
-| `0xABF4` | RX (Notify) | Проприетарный: ответ на хендшейк |
+| `0xABF1` | TX (Write) | Serial channel: host → FC (MSP/CLI/MAVLink) |
+| `0xABF2` | RX (Notify) | Serial channel: FC → host |
+| `0xABF3` | TX (Write) | Proprietary: handshake, device info request |
+| `0xABF4` | RX (Notify) | Proprietary: handshake response |
