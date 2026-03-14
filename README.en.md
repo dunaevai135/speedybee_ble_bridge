@@ -4,9 +4,13 @@
 
 A bridge between SpeedyBee flight controllers (BLE UART) and ground control stations (GCS) over UDP.
 
+There are now two variants in this repository:
+- a Python script for Linux
+- a beta Android app that does the same job: connects to the FC over BLE and forwards traffic over UDP
+
 ## Why
 
-SpeedyBee flight controllers (F405 V4, etc.) have a built-in BLE module (ESP32) that the SpeedyBee mobile app uses to communicate with the FC via MSP protocol. However, full-featured GCS applications — **Mission Planner** and **QGroundControl** — cannot connect to the FC over BLE directly.
+SpeedyBee flight controllers (F405 V4, F405 Wing, eFLY-BLE, etc.) have a built-in BLE module (ESP32) that the SpeedyBee mobile app uses to communicate with the FC via a proprietary BLE protocol plus MSP. However, full-featured GCS applications — **Mission Planner** and **QGroundControl** — cannot connect to the FC over BLE directly.
 
 This script bridges the gap: it connects to the controller over BLE from a computer and creates a transparent serial channel over UDP. The GCS sees it as a regular MAVLink connection.
 
@@ -14,6 +18,13 @@ This allows you to:
 - Configure ArduPilot/Betaflight via Mission Planner or QGroundControl without a USB cable
 - Receive real-time telemetry over BLE
 - Use the flight controller CLI remotely
+
+## What's new
+
+- The script now implements the full SpeedyBee handshake instead of only the basic serial passthrough entry
+- BLE password authentication is supported for newer boards that require it
+- Boards that need an initial MSP packet to start streaming are handled as well
+- The repository now includes a beta Android client with the same purpose; sources are in `android/` and the current build is `app-debug.apk`
 
 ## Requirements
 
@@ -32,6 +43,9 @@ uv run speedybee_ble_bridge.py --addr 10:B4:1D:BD:B6:12
 
 # Connect by device name
 uv run speedybee_ble_bridge.py --name "SpeedyBee F405 V4"
+
+# For boards protected by a BLE password
+uv run speedybee_ble_bridge.py --addr 6C:C8:40:E0:86:64 --password XXXX
 
 # With debug output
 uv run speedybee_ble_bridge.py --addr 10:B4:1D:BD:B6:12 -v
@@ -70,6 +84,7 @@ mavproxy.py --master=udp:127.0.0.1:14550
 | `--scan` | | Scan for BLE devices and exit |
 | `--addr` | | Controller BLE MAC address |
 | `--name` | | BLE device name to search for |
+| `--password` | | BLE password, if the board requires authentication |
 | `--udp-local` | `0.0.0.0:14551` | Local UDP bind address (receive from GCS) |
 | `--udp-remote` | `127.0.0.1:14550` | Remote UDP address (send to GCS) |
 | `-v` | | Verbose logging |

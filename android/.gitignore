@@ -1,0 +1,10 @@
+*.iml
+.gradle/
+.idea/
+build/
+local.properties
+gradle/wrapper/gradle-wrapper.jar
+
+# OS
+.DS_Store
+Thumbs.db
